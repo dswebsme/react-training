@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import Header from "./Header";
 import Order from "./Order";
@@ -7,122 +7,116 @@ import sampleFishes from "../sample-fishes";
 import Fish from "./Fish";
 import base from "../base";
 
-class App extends React.Component {
-  state = {
-    fishes: {},
-    order: {}
+// React Router makes the `{ match }` object available to the component immediately
+// @SEE: https://reacttraining.com/react-router/web/api/match
+// if passing the full `{ match }` object to the component use `match.params.storeId` to get the `storeId`
+// if passing `storeId` directly `storeId` is declared and available within the component
+const App = ({ match: { params: { storeId } } }) => {
+
+  // previously `state` contained `fishes` and `order` objects
+  // declare state variables for `fishes` and `order` so they can be updated independently
+  // @SEE: https://reactjs.org/docs/hooks-faq.html#should-i-use-one-or-many-state-variables
+  const [fishes, setFishes] = useState({});
+
+  // initialize the order state from localStorage (parsed JSON) or as an empty object
+  const [order, setOrder] = useState(JSON.parse(localStorage.getItem(storeId)) || {});
+
+  // declare functions that provide CRUD like features
+  const addFish = fish => {
+    // spread `fishes` and append the new `fish` as useState replaces values instead of merging them
+    // @SEE: https://reactjs.org/docs/hooks-faq.html#should-i-use-one-or-many-state-variables
+    setFishes({ ...fishes, [`fish${Date.now()}`]: fish });
   };
 
-  static propTypes = {
-    match: PropTypes.object
+  const updateFish = (key, updatedFish) => {
+    // spread `fishes` and replace the `fish` at `key` with `updatedFish`
+    setFishes({ ...fishes, [key]: updateFish});
   };
 
-  componentDidMount() {
-    const { params } = this.props.match;
-    // first reinstate our localStorage
-    const localStorageRef = localStorage.getItem(params.storeId);
-    if (localStorageRef) {
-      this.setState({ order: JSON.parse(localStorageRef) });
-    }
+  const deleteFish = key => {
+    // spread `fishes` and null out the value at `key` as required by firebase
+    setFishes({ ...fishes, [key]: null });
+  };
 
-    this.ref = base.syncState(`${params.storeId}/fishes`, {
-      context: this,
+  const loadSampleFishes = () => {
+    // spread `fishes` and append the sampleFishes spread
+    setFishes({ ...fishes, ...sampleFishes });
+  };
+
+  const addToOrder = key => {
+    // spread `order` and increment the value of `key` or set it to 1
+    setOrder({ ...order, [key]: order[key] + 1 || 1 });
+  };
+
+  const removeFromOrder = key => {
+    // declare `orders` as a spread of `order`
+    const orders = { ...order };
+
+    // delete the value found at `key`
+    delete orders[key];
+
+    // replace the previous `order` state with the updated `orders` variable
+    setOrder(orders);
+  };
+
+  // replaces componentDidMount
+  useEffect(() => {
+    const ref = base.syncState(`${storeId}/fishes`, {
+      context: {
+        setState: ({ fishes }) => setFishes({ ...fishes }),
+        state: { fishes },
+      },
       state: "fishes"
-    });
-  }
+    })
 
-  componentDidUpdate() {
-    localStorage.setItem(
-      this.props.match.params.storeId,
-      JSON.stringify(this.state.order)
-    );
-  }
+    // the return handles unmounting (replace componentWillUnmount)
+    return () => {
+      base.removeBinding(ref);
+    }
+  }, []);
 
-  componentWillUnmount() {
-    base.removeBinding(this.ref);
-  }
+  // replaces componentDidUpdate
+  useEffect(() => {
+    localStorage.setItem(storeId, JSON.stringify(order));
+  }, [order]);
 
-  addFish = fish => {
-    // 1. Take a copy of the existing state
-    const fishes = { ...this.state.fishes };
-    // 2. Add our new fish to that fishes variable
-    fishes[`fish${Date.now()}`] = fish;
-    // 3. Set the new fishes object to state
-    this.setState({ fishes });
-  };
-
-  updateFish = (key, updatedFish) => {
-    // 1. Take a copy of the current state
-    const fishes = { ...this.state.fishes };
-    // 2. Update that state
-    fishes[key] = updatedFish;
-    // 3. Set that to state
-    this.setState({ fishes });
-  };
-
-  deleteFish = key => {
-    // 1. take a copy of state
-    const fishes = { ...this.state.fishes };
-    // 2. update the state
-    fishes[key] = null;
-    // 3.  update state
-    this.setState({ fishes });
-  };
-
-  loadSampleFishes = () => {
-    this.setState({ fishes: sampleFishes });
-  };
-
-  addToOrder = key => {
-    // 1. take a copy of state
-    const order = { ...this.state.order };
-    // 2. Either add to the order, or update the number in our order
-    order[key] = order[key] + 1 || 1;
-    // 3. Call setState to update our state object
-    this.setState({ order });
-  };
-
-  removeFromOrder = key => {
-    // 1. take a copy of state
-    const order = { ...this.state.order };
-    // 2. remove that itemf from order
-    delete order[key];
-    // 3. Call setState to update our state object
-    this.setState({ order });
-  };
-
-  render() {
-    return (
-      <div className="catch-of-the-day">
-        <div className="menu">
-          <Header tagline="Fresh Seafood Market" />
-          <ul className="fishes">
-            {Object.keys(this.state.fishes).map(key => (
-              <Fish
-                key={key}
-                index={key}
-                details={this.state.fishes[key]}
-                addToOrder={this.addToOrder}
-              />
-            ))}
-          </ul>
-        </div>
-        <Order
-          fishes={this.state.fishes}
-          order={this.state.order}
-          removeFromOrder={this.removeFromOrder}
-        />
-        <Inventory
-          addFish={this.addFish}
-          updateFish={this.updateFish}
-          deleteFish={this.deleteFish}
-          loadSampleFishes={this.loadSampleFishes}
-          fishes={this.state.fishes}
-          storeId={this.props.match.params.storeId}
-        />
+  // remove the special `render()` method in favor of a direct return statement
+  return (
+    <div className="catch-of-the-day">
+      <div className="menu">
+        <Header tagline="Fresh Seafood Market" />
+        <ul className="fishes">
+          {Object.entries(fishes).map(([key, fish]) =>
+            <Fish
+              key={key}
+              index={key}
+              details={fish}
+              addToOrder={() => addToOrder(key)}
+            />
+          )}
+        </ul>
       </div>
-    );
-  }
+      <Order
+        fishes={fishes}
+        order={order}
+        removeFromOrder={removeFromOrder}
+      />
+      <Inventory
+        addFish={addFish}
+        updateFish={updateFish}
+        deleteFish={deleteFish}
+        loadSampleFishes={loadSampleFishes}
+        fishes={fishes}
+        storeId={storeId}
+      />
+    </div>
+  );
 }
+
+// add the `propTypes` property to the component
+// IMO: declaring this property outside of the component keeps the component logic clean
+App.propTypes = {
+  match: PropTypes.object
+};
 
 export default App;
