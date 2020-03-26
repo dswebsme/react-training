@@ -30,17 +30,41 @@ const App = ({ match: { params: { storeId } } }) => {
 
   const updateFish = (key, updatedFish) => {
     // spread `fishes` and replace the `fish` at `key` with `updatedFish`
-    setFishes({ ...fishes, [key]: updateFish});
+    const updatedFishes = { ...fishes, [key]: updatedFish };
+
+    // update the `fishes` state
+    setFishes(updatedFishes);
+
+    // update `fishes` in firebase via post
+    // @SEE: https://www.npmjs.com/package/re-base#postendpoint-options
+    base.post(`${storeId}/fishes`, {
+      data: updatedFishes
+    });
   };
 
   const deleteFish = key => {
     // spread `fishes` and null out the value at `key` as required by firebase
-    setFishes({ ...fishes, [key]: null });
+    const updatedFishes = { ...fishes, [key]: null }
+
+    // update the `fishes` state
+    setFishes(updatedFishes);
+
+    // update firebase via post
+    // @SEE: https://www.npmjs.com/package/re-base#postendpoint-options
+    base.post(`${storeId}/fishes`, {
+      data: updatedFishes
+    });
   };
 
   const loadSampleFishes = () => {
     // spread `fishes` and append the sampleFishes spread
     setFishes({ ...fishes, ...sampleFishes });
+
+    // push sample data to firebase via post
+    // @SEE: https://www.npmjs.com/package/re-base#postendpoint-options
+    base.post(`${storeId}/fishes`, {
+      data: { ...fishes, ...sampleFishes }
+    });
   };
 
   const addToOrder = key => {
